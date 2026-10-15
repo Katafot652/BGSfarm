@@ -14,29 +14,42 @@ local activeSession = _G.HalloweenFarmSession
 local Settings = {
     FarmHouses = false,
     AutoHatch = false,
-    EggName = "Malevolent Egg",
+    SelectedEgg = "Malevolent Egg",
     HouseCooldown = 60,
     TotalPasses = 3
 }
 
+local EggList = {
+    "Malevolent Egg",
+    "Skull Egg",
+    "Neon Pumpkin Egg"
+}
+
+-- Емуляція натискання клавіші T
 local function pressTKey()
     VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.T, false, game)
     task.wait(0.05)
     VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.T, false, game)
 end
 
-local function getEggPlatformCFrame()
+-- Пошук платформи для будь-якого обраного яйця зі зміщенням НАЗАД (перед яйцем)
+local function getEggPlatformCFrame(eggName)
     local eggsFolder = Workspace:FindFirstChild("Eggs")
     if eggsFolder then
-        local targetEgg = eggsFolder:FindFirstChild(Settings.EggName)
+        local targetEgg = eggsFolder:FindFirstChild(eggName)
         if targetEgg then
+            -- 1. Якщо є деталь Hotkey (плитка перед яйцем)
             local hotkey = targetEgg:FindFirstChild("Hotkey")
             if hotkey and hotkey:IsA("BasePart") then
-                return hotkey.CFrame + Vector3.new(0, 2.5, 0)
+                -- Відступаємо на 3.5 studs назад від центру плити (перед стендом)
+                return hotkey.CFrame + (hotkey.CFrame.LookVector * -3.5) + Vector3.new(0, 2.5, 0)
             end
+            
+            -- 2. Якщо Hotkey немає, беремо Primary або сам меш яйця
             local primary = targetEgg:FindFirstChild("Primary") or targetEgg:FindFirstChildWhichIsA("BasePart")
             if primary then
-                return primary.CFrame + Vector3.new(0, 2.5, 4)
+                -- Відступаємо на 6 studs перед яйцем
+                return primary.CFrame + (primary.CFrame.LookVector * -6) + Vector3.new(0, 2.5, 0)
             end
         end
     end
@@ -55,7 +68,7 @@ local function isHouseReady(house)
     return true
 end
 
--- Створення меню
+-- Створення GUI
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "BGS_MalevolentCombo_GUI"
 ScreenGui.ResetOnSpawn = false
@@ -63,12 +76,13 @@ pcall(function() ScreenGui.Parent = CoreGui end)
 if not ScreenGui.Parent then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 220, 0, 160)
+Frame.Size = UDim2.new(0, 230, 0, 195)
 Frame.Position = UDim2.new(0.05, 0, 0.35, 0)
 Frame.BackgroundColor3 = Color3.fromRGB(25, 20, 18)
 Frame.BorderSizePixel = 0
 Frame.Active = true
 Frame.Draggable = true
+Frame.ClipsDescendants = false
 Frame.Parent = ScreenGui
 
 Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 8)
@@ -80,7 +94,7 @@ local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -30, 0, 26)
 Title.Position = UDim2.new(0, 10, 0, 4)
 Title.BackgroundTransparency = 1
-Title.Text = "🎃 Houses + Jump Farm"
+Title.Text = "🎃 Houses + Multi-Egg [T]"
 Title.TextColor3 = Color3.fromRGB(255, 175, 60)
 Title.TextSize = 13
 Title.Font = Enum.Font.SourceSansBold
@@ -105,37 +119,93 @@ CloseBtn.MouseButton1Click:Connect(function()
     ScreenGui:Destroy()
 end)
 
+-- Кнопка Будинки
 local HouseBtn = Instance.new("TextButton")
-HouseBtn.Size = UDim2.new(0.88, 0, 0, 32)
-HouseBtn.Position = UDim2.new(0.06, 0, 0, 34)
+HouseBtn.Size = UDim2.new(0.88, 0, 0, 30)
+HouseBtn.Position = UDim2.new(0.06, 0, 0, 32)
 HouseBtn.Text = "Будинки: OFF"
 HouseBtn.BackgroundColor3 = Color3.fromRGB(150, 40, 35)
 HouseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 HouseBtn.Font = Enum.Font.SourceSansBold
-HouseBtn.TextSize = 14
+HouseBtn.TextSize = 13
 HouseBtn.Parent = Frame
 Instance.new("UICorner", HouseBtn).CornerRadius = UDim.new(0, 6)
 
+-- Кнопка Хатч
 local HatchBtn = Instance.new("TextButton")
-HatchBtn.Size = UDim2.new(0.88, 0, 0, 32)
-HatchBtn.Position = UDim2.new(0.06, 0, 0, 72)
+HatchBtn.Size = UDim2.new(0.88, 0, 0, 30)
+HatchBtn.Position = UDim2.new(0.06, 0, 0, 66)
 HatchBtn.Text = "Auto [T] Hatch: OFF"
 HatchBtn.BackgroundColor3 = Color3.fromRGB(150, 40, 35)
 HatchBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 HatchBtn.Font = Enum.Font.SourceSansBold
-HatchBtn.TextSize = 14
+HatchBtn.TextSize = 13
 HatchBtn.Parent = Frame
 Instance.new("UICorner", HatchBtn).CornerRadius = UDim.new(0, 6)
 
+-- Головна кнопка Dropdown
+local DropdownBtn = Instance.new("TextButton")
+DropdownBtn.Size = UDim2.new(0.88, 0, 0, 28)
+DropdownBtn.Position = UDim2.new(0.06, 0, 0, 100)
+DropdownBtn.Text = "🥚 " .. Settings.SelectedEgg .. " ▼"
+DropdownBtn.BackgroundColor3 = Color3.fromRGB(42, 32, 30)
+DropdownBtn.TextColor3 = Color3.fromRGB(255, 215, 120)
+DropdownBtn.Font = Enum.Font.SourceSansBold
+DropdownBtn.TextSize = 13
+DropdownBtn.ZIndex = 5
+DropdownBtn.Parent = Frame
+Instance.new("UICorner", DropdownBtn).CornerRadius = UDim.new(0, 5)
+
+-- Контейнер для елементів списку
+local DropdownList = Instance.new("Frame")
+DropdownList.Size = UDim2.new(0.88, 0, 0, #EggList * 26)
+DropdownList.Position = UDim2.new(0.06, 0, 0, 130)
+DropdownList.BackgroundColor3 = Color3.fromRGB(32, 24, 22)
+DropdownList.BorderSizePixel = 0
+DropdownList.Visible = false
+DropdownList.ZIndex = 10
+DropdownList.Parent = Frame
+Instance.new("UICorner", DropdownList).CornerRadius = UDim.new(0, 5)
+local ListStroke = Instance.new("UIStroke", DropdownList)
+ListStroke.Color = Color3.fromRGB(245, 120, 25)
+ListStroke.Thickness = 1
+
+local UIList = Instance.new("UIListLayout", DropdownList)
+UIList.SortOrder = Enum.SortOrder.LayoutOrder
+
+-- Статус
 local Status = Instance.new("TextLabel")
-Status.Size = UDim2.new(0.9, 0, 0, 35)
-Status.Position = UDim2.new(0.05, 0, 0, 112)
+Status.Size = UDim2.new(0.9, 0, 0, 30)
+Status.Position = UDim2.new(0.05, 0, 0, 158)
 Status.BackgroundTransparency = 1
 Status.Text = "Статус: Очікування"
 Status.TextColor3 = Color3.fromRGB(190, 190, 190)
 Status.TextSize = 12
 Status.Font = Enum.Font.SourceSans
 Status.Parent = Frame
+
+-- Наповнення списку
+for _, eggName in ipairs(EggList) do
+    local ItemBtn = Instance.new("TextButton")
+    ItemBtn.Size = UDim2.new(1, 0, 0, 26)
+    ItemBtn.BackgroundTransparency = 1
+    ItemBtn.Text = eggName
+    ItemBtn.TextColor3 = Color3.fromRGB(240, 240, 240)
+    ItemBtn.Font = Enum.Font.SourceSans
+    ItemBtn.TextSize = 13
+    ItemBtn.ZIndex = 11
+    ItemBtn.Parent = DropdownList
+
+    ItemBtn.MouseButton1Click:Connect(function()
+        Settings.SelectedEgg = eggName
+        DropdownBtn.Text = "🥚 " .. eggName .. " ▼"
+        DropdownList.Visible = false
+    end)
+end
+
+DropdownBtn.MouseButton1Click:Connect(function()
+    DropdownList.Visible = not DropdownList.Visible
+end)
 
 local fixedDoorTargets = {}
 
@@ -159,6 +229,7 @@ local function startCoordinator()
                 task.wait(0.2)
             end
 
+            -- Обхід будинків
             if Settings.FarmHouses and housesFolder then
                 for currentPass = 1, Settings.TotalPasses do
                     if not Settings.FarmHouses or _G.HalloweenFarmSession ~= thisSession then break end
@@ -189,7 +260,6 @@ local function startCoordinator()
                             rootPart.Anchored = true
                             rootPart.CanCollide = false
 
-                            -- Телепорт на землю перед дверима
                             root.CFrame = CFrame.new(targetPos.X, targetPos.Y + 1.2, targetPos.Z)
 
                             pcall(function()
@@ -198,13 +268,8 @@ local function startCoordinator()
                                 firetouchinterest(root, rootPart, 1)
                             end)
 
-                            -- Очікування 0.2с перед стрибком
                             task.wait(0.2)
-
-                            -- Стрибок для оновлення колізії сервером
                             humanoid.Jump = true
-
-                            -- Очікування 0.3с після стрибка перед наступним ТП
                             task.wait(0.3)
                         end
                     end
@@ -212,7 +277,8 @@ local function startCoordinator()
                 end
             end
 
-            local eggCFrame = getEggPlatformCFrame()
+            -- Телепорт до обраного яйця
+            local eggCFrame = getEggPlatformCFrame(Settings.SelectedEgg)
             if Settings.AutoHatch and eggCFrame then
                 root.CFrame = eggCFrame
                 task.wait(0.3)
@@ -220,6 +286,7 @@ local function startCoordinator()
                 isHatchingActive = true
             end
 
+            -- Таймер КД
             local cooldown = Settings.FarmHouses and Settings.HouseCooldown or 3
             local startTime = tick()
 
@@ -228,7 +295,7 @@ local function startCoordinator()
                 local left = math.max(0, math.floor(cooldown - (tick() - startTime)))
                 
                 if Settings.AutoHatch then
-                    Status.Text = string.format("Хетч [T] (КД: %dc)", left)
+                    Status.Text = string.format("%s [T] (%dc)", Settings.SelectedEgg, left)
                 else
                     Status.Text = string.format("КД будинків: %d сек...", left)
                 end
