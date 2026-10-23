@@ -14,12 +14,13 @@ local activeSession = _G.HalloweenFarmSession
 local Settings = {
     FarmHouses = false,
     AutoHatch = false,
-    SelectedEgg = "Malevolent Egg",
+    SelectedEgg = "Radioactive Egg",
     HouseCooldown = 60,
     TotalPasses = 3
 }
 
 local EggList = {
+    "Radioactive Egg",
     "Malevolent Egg",
     "Skull Egg",
     "Neon Pumpkin Egg"
@@ -32,24 +33,19 @@ local function pressTKey()
     VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.T, false, game)
 end
 
--- Пошук платформи для будь-якого обраного яйця зі зміщенням НАЗАД (перед яйцем)
+-- Пошук платформи яйця зі зміщенням вперед/назад від стенда
 local function getEggPlatformCFrame(eggName)
     local eggsFolder = Workspace:FindFirstChild("Eggs")
     if eggsFolder then
         local targetEgg = eggsFolder:FindFirstChild(eggName)
         if targetEgg then
-            -- 1. Якщо є деталь Hotkey (плитка перед яйцем)
             local hotkey = targetEgg:FindFirstChild("Hotkey")
             if hotkey and hotkey:IsA("BasePart") then
-                -- Відступаємо на 3.5 studs назад від центру плити (перед стендом)
                 return hotkey.CFrame + (hotkey.CFrame.LookVector * -3.5) + Vector3.new(0, 2.5, 0)
             end
-            
-            -- 2. Якщо Hotkey немає, беремо Primary або сам меш яйця
             local primary = targetEgg:FindFirstChild("Primary") or targetEgg:FindFirstChildWhichIsA("BasePart")
             if primary then
-                -- Відступаємо на 6 studs перед яйцем
-                return primary.CFrame + (primary.CFrame.LookVector * -6) + Vector3.new(0, 2.5, 0)
+                return primary.CFrame + (primary.CFrame.LookVector * -5.5) + Vector3.new(0, 2.5, 0)
             end
         end
     end
@@ -143,7 +139,7 @@ HatchBtn.TextSize = 13
 HatchBtn.Parent = Frame
 Instance.new("UICorner", HatchBtn).CornerRadius = UDim.new(0, 6)
 
--- Головна кнопка Dropdown
+-- Dropdown Кнопка
 local DropdownBtn = Instance.new("TextButton")
 DropdownBtn.Size = UDim2.new(0.88, 0, 0, 28)
 DropdownBtn.Position = UDim2.new(0.06, 0, 0, 100)
@@ -184,7 +180,7 @@ Status.TextSize = 12
 Status.Font = Enum.Font.SourceSans
 Status.Parent = Frame
 
--- Наповнення списку
+-- Створення кнопок у списку
 for _, eggName in ipairs(EggList) do
     local ItemBtn = Instance.new("TextButton")
     ItemBtn.Size = UDim2.new(1, 0, 0, 26)
